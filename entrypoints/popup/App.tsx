@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Octokit } from '@octokit/rest';
 
 type SubmissionData = {
   submissionId: number;
@@ -15,9 +16,52 @@ type SubmissionData = {
   capturedAt: number;
 };
 
+const EXTENSION_MAP: Record<string, string> = {
+  java: 'java', python: 'py', python3: 'py', javascript: 'js',
+  typescript: 'ts', cpp: 'cpp', c: 'c', csharp: 'cs', golang: 'go',
+  kotlin: 'kt', swift: 'swift', rust: 'rs', ruby: 'rb', scala: 'scala', php: 'php',
+};
+
+function toBase64(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+  return btoa(binary);
+}
+
 function App() {
   const [submission, setSubmission] = useState<SubmissionData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pushStatus, setPushStatus] = useState<string | null>(null);
+
+  async function handlePush() {
+    if (!submission) return;
+    setPushStatus('Pushing…');
+    try {
+      const result = await browser.storage.local.get('leetflowConfig');
+      const config = result.leetflowConfig as { githubToken: string; owner: string; repo: string } | undefined;
+      if (!config) {
+        setPushStatus('❌ No GitHub config — set it up in Options first.');
+        return;
+      }
+
+      const octokit = new Octokit({ auth: config.githubToken });
+      const ext = EXTENSION_MAP[submission.lang] ?? 'txt';
+      const path = `LeetCode/${submission.questionFrontendId}-${submission.titleSlug}.${ext}`;
+
+      await octokit.rest.repos.createOrUpdateFileContents({
+        owner: config.owner,
+        repo: config.repo,
+        path,
+        message: `Add solution: ${submission.questionFrontendId}. ${submission.title}`,
+        content: toBase64(submission.code),
+      });
+
+      setPushStatus(`✅ Pushed to ${path}`);
+    } catch (err: any) {
+      setPushStatus(`❌ Push failed: ${err.message ?? 'unknown error'}`);
+    }
+  }
 
   useEffect(() => {
     browser.storage.local.get('leetsyncLatestSubmission').then((result) => {
@@ -94,6 +138,11 @@ function App() {
           {submission.code}
         </pre>
       </details>
+
+      <button onClick={handlePush} style={{ marginTop: '12px', padding: '6px 14px' }}>
+        Push to GitHub
+      </button>
+      {pushStatus && <p style={{ marginTop: '8px', fontSize: '12px' }}>{pushStatus}</p>}
     </div>
   );
 }
