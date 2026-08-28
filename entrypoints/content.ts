@@ -20,17 +20,31 @@ export default defineContentScript({
         const questionDetail = await fetchQuestionDetail(titleSlug);
         console.log('[LeetSync] questionDetail:', questionDetail);
 
-        // Not yet wired to background/popup — that's the next step.
-        console.log('[LeetSync] combined package ready:', {
+        const payload = {
+          submissionId,
           code: submissionDetails.code,
           lang: submissionDetails.lang?.name,
           title: questionDetail.title,
           titleSlug: questionDetail.titleSlug,
+          questionId: questionDetail.questionId,
+          questionFrontendId: questionDetail.questionFrontendId,
           difficulty: questionDetail.difficulty,
           topicTags: questionDetail.topicTags,
+          runtime: submissionDetails.runtimeDisplay,
+          memory: submissionDetails.memoryDisplay,
+          capturedAt: Date.now(),
+        };
+
+        console.log('[LeetSync] sending package to background:', payload);
+
+        const response = await browser.runtime.sendMessage({
+          type: 'leetsync:accepted-submission',
+          payload,
         });
+
+        console.log('[LeetSync] background acknowledged:', response);
       } catch (err) {
-        console.error('[LeetSync] failed to fetch submission/question details', err);
+        console.error('[LeetSync] failed to fetch/send submission data', err);
       }
     });
   },
