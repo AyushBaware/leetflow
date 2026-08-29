@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Octokit } from '@octokit/rest';
+import './App.css';
 
 type LeetflowConfig = {
   githubToken: string;
@@ -11,7 +12,7 @@ function App() {
   const [token, setToken] = useState('');
   const [owner, setOwner] = useState('');
   const [repo, setRepo] = useState('');
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ type: 'pending' | 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     browser.storage.local.get('leetflowConfig').then((result) => {
@@ -25,51 +26,48 @@ function App() {
   }, []);
 
   async function handleSave() {
-    setStatus('Testing connection…');
+    setStatus({ type: 'pending', message: 'Testing connection…' });
     try {
       const octokit = new Octokit({ auth: token });
       const res = await octokit.rest.repos.get({ owner, repo });
       await browser.storage.local.set({
         leetflowConfig: { githubToken: token, owner, repo } satisfies LeetflowConfig,
       });
-      setStatus(`✅ Connected to ${res.data.full_name}. Settings saved.`);
+      setStatus({ type: 'success', message: `Connected to ${res.data.full_name}. Settings saved.` });
     } catch (err: any) {
-      setStatus(`❌ Failed: ${err.message ?? 'unknown error'}`);
+      setStatus({ type: 'error', message: err.message ?? 'unknown error' });
     }
   }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '420px', fontFamily: 'sans-serif' }}>
-      <h2>LeetFlow Settings</h2>
-      <p style={{ fontSize: '13px', color: '#888' }}>
+    <div className="options">
+      <p className="options__logo">Leet<span className="options__logo-accent">Flow</span></p>
+      <p className="options__subtitle">
         Fine-grained GitHub token, scoped to this repo only, with "Contents: Read and write."
       </p>
 
-      <label style={{ display: 'block', marginTop: '12px', fontSize: '13px' }}>
-        GitHub Token
-        <input type="password" value={token} onChange={(e) => setToken(e.target.value)}
-          style={{ display: 'block', width: '100%', padding: '6px', marginTop: '4px' }} />
-      </label>
+      <div className="field">
+        <label>GitHub Token</label>
+        <input type="password" value={token} onChange={(e) => setToken(e.target.value)} />
+      </div>
 
-      <label style={{ display: 'block', marginTop: '12px', fontSize: '13px' }}>
-        Repo owner
-        <input type="text" value={owner} onChange={(e) => setOwner(e.target.value)}
-          placeholder="AyushBaware"
-          style={{ display: 'block', width: '100%', padding: '6px', marginTop: '4px' }} />
-      </label>
+      <div className="field">
+        <label>Repo owner</label>
+        <input type="text" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="AyushBaware" />
+      </div>
 
-      <label style={{ display: 'block', marginTop: '12px', fontSize: '13px' }}>
-        Repo name
-        <input type="text" value={repo} onChange={(e) => setRepo(e.target.value)}
-          placeholder="leetflow"
-          style={{ display: 'block', width: '100%', padding: '6px', marginTop: '4px' }} />
-      </label>
+      <div className="field">
+        <label>Repo name</label>
+        <input type="text" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="java-dsa-journey" />
+      </div>
 
-      <button onClick={handleSave} style={{ marginTop: '16px', padding: '8px 16px' }}>
-        Save &amp; Test Connection
-      </button>
+      <button className="save-button" onClick={handleSave}>Save &amp; Test Connection</button>
 
-      {status && <p style={{ marginTop: '12px', fontSize: '13px' }}>{status}</p>}
+      {status && (
+        <div className={`status status--${status.type}`}>
+          {status.type === 'success' ? '✓ ' : status.type === 'error' ? '✕ ' : ''}{status.message}
+        </div>
+      )}
     </div>
   );
 }

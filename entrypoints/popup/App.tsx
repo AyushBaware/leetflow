@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Octokit } from '@octokit/rest';
+import './App.css';
 
 type SubmissionData = {
   submissionId: number;
@@ -37,6 +38,23 @@ function toBase64(str: string): string {
   return btoa(binary);
 }
 
+function toPascalCase(title: string): string {
+  return title
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('');
+}
+
+function difficultyClass(difficulty: string): string {
+  const d = difficulty.toLowerCase();
+  if (d === 'easy') return 'badge badge--easy';
+  if (d === 'medium') return 'badge badge--medium';
+  if (d === 'hard') return 'badge badge--hard';
+  return 'badge';
+}
+
 function App() {
   const [submission, setSubmission] = useState<SubmissionData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,7 +68,8 @@ function App() {
   const [selectedFolder, setSelectedFolder] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
 
-  const [pushStatus, setPushStatus] = useState<string | null>(null);
+  const [codeExpanded, setCodeExpanded] = useState(false);
+  const [pushStatus, setPushStatus] = useState<{ type: 'pending' | 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -65,8 +84,10 @@ function App() {
 
       if (sub) {
         const ext = EXTENSION_MAP[sub.lang] ?? 'txt';
-        setFilename(`${sub.questionFrontendId}-${sub.titleSlug}.${ext}`);
-        setCommitMessage(`Solved ${sub.questionFrontendId}. ${sub.title}`);
+        setFilename(`${sub.questionFrontendId}_${toPascalCase(sub.title)}.${ext}`);
+        setCommitMessage(
+          `Solved ${sub.questionFrontendId}. ${sub.title} — ${sub.topicTags.map((t) => t.name).join(', ')}`
+        );
       }
       setLoading(false);
     });
@@ -90,23 +111,25 @@ function App() {
       .finally(() => setFoldersLoading(false));
   }, [config]);
 
+  const activeFolder = selectedFolder === NEW_FOLDER_OPTION ? newFolderName.trim() : selectedFolder;
+  const destinationPath = activeFolder && filename ? `${activeFolder}/${filename}` : null;
+
   async function handlePush() {
     if (!submission || !config) return;
 
-    const folder = selectedFolder === NEW_FOLDER_OPTION ? newFolderName.trim() : selectedFolder;
-    if (!folder) {
-      setPushStatus('❌ Choose or name a folder first.');
+    if (!activeFolder) {
+      setPushStatus({ type: 'error', message: 'Choose or name a folder first.' });
       return;
     }
     if (!filename.trim()) {
-      setPushStatus('❌ Filename is empty.');
+      setPushStatus({ type: 'error', message: 'Filename is empty.' });
       return;
     }
 
-    setPushStatus('Pushing…');
+    setPushStatus({ type: 'pending', message: 'Pushing…' });
     try {
       const octokit = new Octokit({ auth: config.githubToken });
-      const path = `${folder}/${filename.trim()}`;
+      const path = `${activeFolder}/${filename.trim()}`;
 
       await octokit.rest.repos.createOrUpdateFileContents({
         owner: config.owner,
@@ -116,107 +139,118 @@ function App() {
         content: toBase64(submission.code),
       });
 
-      setPushStatus(`✅ Pushed to ${path}`);
+      setPushStatus({ type: 'success', message: `Pushed to ${path}` });
+
+      if (selectedFolder === NEW_FOLDER_OPTION && activeFolder) {
+        setFolders((prev) => [...prev, activeFolder].sort());
+        setSelectedFolder(activeFolder);
+        setNewFolderName('');
+      }
     } catch (err: any) {
-      setPushStatus(`❌ Push failed: ${err.message ?? 'unknown error'}`);
+      setPushStatus({ type: 'error', message: err.message ?? 'unknown error' });
     }
   }
 
   if (loading) {
     return (
-      <div style={{ padding: '16px', width: '320px', fontFamily: 'sans-serif' }}>
-        <h3>LeetFlow</h3>
-        <p>Loading…</p>
+      <div className="popup">
+        <div className="popup__header">
+          <span className="popup__logo">Leet<span className="popup__logo-accent">Flow</span></span>
+        </div>
+        <div className="empty-state">Loading…</div>
       </div>
     );
   }
 
   if (!submission) {
     return (
-      <div style={{ padding: '16px', width: '320px', fontFamily: 'sans-serif' }}>
-        <h3>LeetFlow</h3>
-        <p>No accepted submission captured yet. Solve and submit a problem on LeetCode to get started.</p>
+      <div className="popup">
+        <div className="popup__header">
+          <span className="popup__logo">Leet<span className="popup__logo-accent">Flow</span></span>
+        </div>
+        <div className="empty-state">No accepted submission captured yet.<br />Solve and submit a problem on LeetCode to get started.</div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '16px', width: '320px', fontFamily: 'sans-serif' }}>
-      <h3 style={{ marginBottom: '4px' }}>LeetFlow</h3>
-      <p style={{ margin: '0 0 12px', color: '#888', fontSize: '12px' }}>
-        Captured {new Date(submission.capturedAt).toLocaleString()}
-      </p>
+    <div className="popup">
+      <div className="popup__header">
+        <span className="popup__logo">Leet<span className="popup__logo-accent">Flow</span></span>
+      </div>
+      <p className="popup__timestamp">Captured {new Date(submission.capturedAt).toLocaleString()}</p>
 
-      <div style={{ marginBottom: '8px' }}>
-        <strong>{submission.questionFrontendId}. {submission.title}</strong>
+      <div className="card">
+        <p className="problem-title">{submission.questionFrontendId}. {submission.title}</p>
+        <div className="meta-row">
+          <span className={difficultyClass(submission.difficulty)}>{submission.difficulty}</span>
+          <span className="stat">{submission.lang}</span>
+          <span className="stat">{submission.runtime}</span>
+          <span className="stat">{submission.memory}</span>
+        </div>
+        <div className="tags">
+          {submission.topicTags.map((tag) => (
+            <span key={tag.slug} className="tag">{tag.name}</span>
+          ))}
+        </div>
       </div>
 
-      <div style={{ marginBottom: '8px', fontSize: '13px' }}>
-        <span>{submission.difficulty}</span> · <span>{submission.lang}</span> ·{' '}
-        <span>{submission.runtime}</span> · <span>{submission.memory}</span>
+      <div className="code-window">
+        <div className="code-window__chrome" onClick={() => setCodeExpanded((v) => !v)}>
+          <span className="code-window__dot" />
+          <span className="code-window__dot" />
+          <span className="code-window__dot" />
+          <span className="code-window__filename">{filename || 'solution'}</span>
+          <span className="code-window__toggle">{codeExpanded ? 'Hide' : 'View'}</span>
+        </div>
+        {codeExpanded && <pre>{submission.code}</pre>}
       </div>
 
-      <div style={{ marginBottom: '12px' }}>
-        {submission.topicTags.map((tag) => (
-          <span key={tag.slug} style={{
-            display: 'inline-block', fontSize: '11px', background: '#eee',
-            borderRadius: '4px', padding: '2px 6px', marginRight: '4px', marginBottom: '4px',
-          }}>
-            {tag.name}
-          </span>
-        ))}
+      <div className="field">
+        <label>Filename</label>
+        <input type="text" value={filename} onChange={(e) => setFilename(e.target.value)} />
       </div>
 
-      <details>
-        <summary style={{ cursor: 'pointer', fontSize: '13px' }}>View code</summary>
-        <pre style={{
-          fontSize: '11px', background: '#f5f5f5', padding: '8px',
-          borderRadius: '4px', overflowX: 'auto', maxHeight: '200px',
-        }}>
-          {submission.code}
-        </pre>
-      </details>
+      <div className="field">
+        <label>Commit message</label>
+        <input type="text" value={commitMessage} onChange={(e) => setCommitMessage(e.target.value)} />
+      </div>
 
-      <hr style={{ margin: '12px 0' }} />
-
-      <label style={{ display: 'block', fontSize: '12px', marginBottom: '10px' }}>
-        Filename
-        <input type="text" value={filename} onChange={(e) => setFilename(e.target.value)}
-          style={{ display: 'block', width: '100%', padding: '5px', marginTop: '3px' }} />
-      </label>
-
-      <label style={{ display: 'block', fontSize: '12px', marginBottom: '10px' }}>
-        Commit message
-        <input type="text" value={commitMessage} onChange={(e) => setCommitMessage(e.target.value)}
-          style={{ display: 'block', width: '100%', padding: '5px', marginTop: '3px' }} />
-      </label>
-
-      <label style={{ display: 'block', fontSize: '12px', marginBottom: '10px' }}>
-        Folder
+      <div className="field">
+        <label>Folder</label>
         {foldersLoading ? (
-          <p style={{ fontSize: '12px', color: '#888' }}>Loading folders…</p>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Loading folders…</p>
         ) : (
-          <select value={selectedFolder} onChange={(e) => setSelectedFolder(e.target.value)}
-            style={{ display: 'block', width: '100%', padding: '5px', marginTop: '3px' }}>
+          <select value={selectedFolder} onChange={(e) => setSelectedFolder(e.target.value)}>
             {folders.map((f) => <option key={f} value={f}>{f}</option>)}
             <option value={NEW_FOLDER_OPTION}>+ Create new folder…</option>
           </select>
         )}
-      </label>
+      </div>
 
       {selectedFolder === NEW_FOLDER_OPTION && (
-        <label style={{ display: 'block', fontSize: '12px', marginBottom: '10px' }}>
-          New folder name
-          <input type="text" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)}
-            placeholder="e.g. Arrays"
-            style={{ display: 'block', width: '100%', padding: '5px', marginTop: '3px' }} />
-        </label>
+        <div className="field">
+          <label>New folder name</label>
+          <input type="text" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="e.g. Trees" />
+        </div>
       )}
 
-      <button onClick={handlePush} style={{ marginTop: '8px', padding: '6px 14px' }}>
-        Push to GitHub
+      {destinationPath && (
+        <div className="destination">
+          <span>→</span>
+          <span className="destination__path">{destinationPath}</span>
+        </div>
+      )}
+
+      <button className="push-button" onClick={handlePush} disabled={pushStatus?.type === 'pending'}>
+        {pushStatus?.type === 'pending' ? 'Pushing…' : 'Push to GitHub'}
       </button>
-      {pushStatus && <p style={{ marginTop: '8px', fontSize: '12px' }}>{pushStatus}</p>}
+
+      {pushStatus && (
+        <div className={`status status--${pushStatus.type}`}>
+          {pushStatus.type === 'success' ? '✓ ' : pushStatus.type === 'error' ? '✕ ' : ''}{pushStatus.message}
+        </div>
+      )}
     </div>
   );
 }
