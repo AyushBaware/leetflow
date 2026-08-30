@@ -230,6 +230,23 @@ function App() {
     );
   }
 
+  if (!config) {
+    return (
+      <div className="popup">
+        <div className="popup__header">
+          <span className="popup__logo">Leet<span className="popup__logo-accent">Flow</span></span>
+        </div>
+        <div className="empty-state">
+          GitHub isn't connected yet.<br />
+          Add your token and repo in Settings before you can push.
+        </div>
+        <button className="push-button" onClick={() => browser.runtime.openOptionsPage()}>
+          Open Settings
+        </button>
+      </div>
+    );
+  }
+
   if (!submission) {
     return (
       <div className="popup">
