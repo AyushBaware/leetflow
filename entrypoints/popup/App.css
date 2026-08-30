@@ -90,5 +90,6 @@ body {
 .status--success { background: var(--success-bg); border-left-color: var(--success); color: var(--success); }
 .status--error { background: var(--error-bg); border-left-color: var(--error); color: var(--error); }
 .status--pending { background: var(--surface-raised); border-left-color: var(--text-secondary); color: var(--text-secondary); }
+.status--warning { background: rgba(255, 161, 22, 0.1); border-left-color: var(--medium); color: var(--medium); }
 
 .empty-state { text-align: center; padding: 30px 16px; color: var(--text-secondary); font-size: 13px; line-height: 1.6; }

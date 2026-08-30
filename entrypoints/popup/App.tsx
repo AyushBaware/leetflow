@@ -47,6 +47,21 @@ function toPascalCase(title: string): string {
     .join('');
 }
 
+// Looks for a line like "// Approach: HashMap" or "# Technique: Two Pointers"
+// in the first 10 lines of the code, regardless of language/comment syntax.
+function extractApproachTag(code: string): string | null {
+  const lines = code.split('\n').slice(0, 10);
+  for (const rawLine of lines) {
+    const cleaned = rawLine
+      .replace(/^[\s/*#-]+/, '')
+      .replace(/\*+\/\s*$/, '')
+      .trim();
+    const match = cleaned.match(/^(?:approach|technique)\s*[:\-]\s*(.+)$/i);
+    if (match) return match[1].trim();
+  }
+  return null;
+}
+
 function difficultyClass(difficulty: string): string {
   const d = difficulty.toLowerCase();
   if (d === 'easy') return 'badge badge--easy';
@@ -69,7 +84,9 @@ function App() {
   const [newFolderName, setNewFolderName] = useState('');
 
   const [codeExpanded, setCodeExpanded] = useState(false);
-  const [pushStatus, setPushStatus] = useState<{ type: 'pending' | 'success' | 'error'; message: string } | null>(null);
+  const [fileExists, setFileExists] = useState(false);
+  const [overwriteConfirmed, setOverwriteConfirmed] = useState(false);
+  const [pushStatus, setPushStatus] = useState<{ type: 'pending' | 'success' | 'error' | 'warning'; message: string } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -84,10 +101,18 @@ function App() {
 
       if (sub) {
         const ext = EXTENSION_MAP[sub.lang] ?? 'txt';
-        setFilename(`${sub.questionFrontendId}_${toPascalCase(sub.title)}.${ext}`);
-        setCommitMessage(
-          `Solved ${sub.questionFrontendId}. ${sub.title} — ${sub.topicTags.map((t) => t.name).join(', ')}`
-        );
+        const approach = extractApproachTag(sub.code);
+        const baseTitle = toPascalCase(sub.title);
+
+        if (approach) {
+          setFilename(`${sub.questionFrontendId}_${baseTitle}_${toPascalCase(approach)}.${ext}`);
+          setCommitMessage(`Solved ${sub.questionFrontendId}. ${sub.title} using ${approach}`);
+        } else {
+          setFilename(`${sub.questionFrontendId}_${baseTitle}.${ext}`);
+          setCommitMessage(
+            `Solved ${sub.questionFrontendId}. ${sub.title} — ${sub.topicTags.map((t) => t.name).join(', ')}`
+          );
+        }
       }
       setLoading(false);
     });
@@ -114,6 +139,24 @@ function App() {
   const activeFolder = selectedFolder === NEW_FOLDER_OPTION ? newFolderName.trim() : selectedFolder;
   const destinationPath = activeFolder && filename ? `${activeFolder}/${filename}` : null;
 
+  // Check whether the target path already has a file — resets the confirm
+  // gate any time the destination actually changes.
+  useEffect(() => {
+    setOverwriteConfirmed(false);
+    if (!config || !destinationPath) {
+      setFileExists(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const octokit = new Octokit({ auth: config.githubToken });
+      octokit.rest.repos
+        .getContent({ owner: config.owner, repo: config.repo, path: destinationPath })
+        .then(() => setFileExists(true))
+        .catch(() => setFileExists(false));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [config, destinationPath]);
+
   async function handlePush() {
     if (!submission || !config) return;
 
@@ -126,10 +169,29 @@ function App() {
       return;
     }
 
-    setPushStatus({ type: 'pending', message: 'Pushing…' });
+    // First click on a collision only asks for confirmation — nothing is
+    // written to GitHub yet.
+    if (fileExists && !overwriteConfirmed) {
+      setOverwriteConfirmed(true);
+      setPushStatus({
+        type: 'warning',
+        message: 'A file already exists at this path. Click "Confirm Overwrite" to replace it, or change the filename to keep both.',
+      });
+      return;
+    }
+
+    setPushStatus({ type: 'pending', message: overwriteConfirmed ? 'Overwriting…' : 'Pushing…' });
     try {
       const octokit = new Octokit({ auth: config.githubToken });
       const path = `${activeFolder}/${filename.trim()}`;
+
+      let existingSha: string | undefined;
+      try {
+        const existing = await octokit.rest.repos.getContent({ owner: config.owner, repo: config.repo, path });
+        if (!Array.isArray(existing.data)) existingSha = existing.data.sha;
+      } catch (err: any) {
+        if (err.status !== 404) throw err;
+      }
 
       await octokit.rest.repos.createOrUpdateFileContents({
         owner: config.owner,
@@ -137,9 +199,11 @@ function App() {
         path,
         message: commitMessage.trim() || `Add solution: ${submission.title}`,
         content: toBase64(submission.code),
+        ...(existingSha ? { sha: existingSha } : {}),
       });
 
-      setPushStatus({ type: 'success', message: `Pushed to ${path}` });
+      setPushStatus({ type: 'success', message: existingSha ? `Updated ${path}` : `Pushed to ${path}` });
+      setOverwriteConfirmed(false);
 
       if (selectedFolder === NEW_FOLDER_OPTION && activeFolder) {
         setFolders((prev) => [...prev, activeFolder].sort());
@@ -147,7 +211,11 @@ function App() {
         setNewFolderName('');
       }
     } catch (err: any) {
-      setPushStatus({ type: 'error', message: err.message ?? 'unknown error' });
+      let message = err.message ?? 'Unknown error';
+      if (err.status === 401) message = 'GitHub token is invalid or expired — update it in Options.';
+      else if (err.status === 403) message = 'Rate limited, or token lacks permission for this repo.';
+      else if (err.status === 404) message = 'Repo not found — check owner/repo in Options.';
+      setPushStatus({ type: 'error', message });
     }
   }
 
@@ -172,6 +240,11 @@ function App() {
       </div>
     );
   }
+
+  let buttonLabel = 'Push to GitHub';
+  if (pushStatus?.type === 'pending') buttonLabel = overwriteConfirmed ? 'Overwriting…' : 'Pushing…';
+  else if (fileExists && overwriteConfirmed) buttonLabel = 'Confirm Overwrite';
+  else if (fileExists) buttonLabel = 'File exists — Push anyway?';
 
   return (
     <div className="popup">
@@ -242,11 +315,17 @@ function App() {
         </div>
       )}
 
+      {fileExists && (
+        <div className="status status--warning">
+          A file already exists at this path. Rename to keep both, or push twice to confirm overwrite.
+        </div>
+      )}
+
       <button className="push-button" onClick={handlePush} disabled={pushStatus?.type === 'pending'}>
-        {pushStatus?.type === 'pending' ? 'Pushing…' : 'Push to GitHub'}
+        {buttonLabel}
       </button>
 
-      {pushStatus && (
+      {pushStatus && pushStatus.type !== 'warning' && (
         <div className={`status status--${pushStatus.type}`}>
           {pushStatus.type === 'success' ? '✓ ' : pushStatus.type === 'error' ? '✕ ' : ''}{pushStatus.message}
         </div>
