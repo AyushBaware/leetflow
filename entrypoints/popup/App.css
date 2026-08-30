@@ -86,7 +86,7 @@ body {
 .push-button:hover { background: var(--accent-hover); }
 .push-button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.status { margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 12px; border-left: 3px solid transparent; }
+.status { margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 12px; border-left: 3px solid transparent; word-break: break-word; }
 .status--success { background: var(--success-bg); border-left-color: var(--success); color: var(--success); }
 .status--error { background: var(--error-bg); border-left-color: var(--error); color: var(--error); }
 .status--pending { background: var(--surface-raised); border-left-color: var(--text-secondary); color: var(--text-secondary); }
