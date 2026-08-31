@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #0D1117; --surface: #161B22; --surface-raised: #1C2333; --border: #30363D;
+  --text-primary: #E6EDF3; --text-secondary: #8B949E;
+  --accent: #7C6FF0; --accent-hover: #8F84F5; --accent-bg: rgba(124, 111, 240, 0.12);
+  --success: #3FB950; --success-bg: rgba(63, 185, 80, 0.1);
+  --error: #F85149; --error-bg: rgba(248, 81, 73, 0.1);
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); font-family: var(--font-body); }
+
+.options { max-width: 440px; margin: 0 auto; padding: 32px 24px; color: var(--text-primary); }
+.options__logo { font-family: var(--font-display); font-weight: 700; font-size: 20px; margin: 0 0 4px; }
+.options__logo-accent { color: var(--accent); }
+.options__subtitle { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 20px; }
+
+.field { margin-bottom: 14px; }
+.field label { display: block; font-family: var(--font-display); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 5px; }
+.field input {
+  width: 100%; padding: 9px 11px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text-primary); font-family: var(--font-mono); font-size: 13px;
+  outline: none; transition: border-color 0.15s;
+}
+.field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+
+.save-button {
+  width: 100%; padding: 10px; background: var(--accent); color: #fff; border: none; border-radius: 6px;
+  font-family: var(--font-display); font-weight: 600; font-size: 13px; cursor: pointer; margin-top: 6px; transition: background 0.15s;
+}
+.save-button:hover { background: var(--accent-hover); }
+
+.status { margin-top: 12px; padding: 9px 11px; border-radius: 6px; font-size: 12px; border-left: 3px solid transparent; }
+.status--success { background: var(--success-bg); border-left-color: var(--success); color: var(--success); }
+.status--error { background: var(--error-bg); border-left-color: var(--error); color: var(--error); }
+.status--pending { background: var(--surface-raised); border-left-color: var(--text-secondary); color: var(--text-secondary); }
