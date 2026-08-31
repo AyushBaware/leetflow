@@ -5,26 +5,27 @@ export default defineContentScript({
   main() {
     console.log('[LeetSync] hook loaded in page context');
 
-    // Tracks the submission currently being judged.
-    let pendingSubmissionId: string | number | null = null;
+    // Tracks every submission currently being judged — a Set rather than a
+    // single value, so a fast double-submit can't drop an earlier one.
+    const pendingSubmissionIds = new Set<string>();
 
     function handleCheckResponse(body: string) {
-      if (!pendingSubmissionId) return;
       try {
         const parsed = JSON.parse(body);
-        if (String(parsed.submission_id) !== String(pendingSubmissionId)) return;
+        const id = String(parsed.submission_id);
+        if (!pendingSubmissionIds.has(id)) return;
         if (parsed.state === 'SUCCESS') {
           if (parsed.status_msg === 'Accepted' && parsed.status_code === 10) {
-            console.log('[LeetSync] Accepted! submissionId:', pendingSubmissionId);
+            console.log('[LeetSync] Accepted! submissionId:', id);
             window.dispatchEvent(
               new CustomEvent('leetsync:accepted', {
-                detail: { submissionId: pendingSubmissionId },
+                detail: { submissionId: id },
               }),
             );
           } else {
             console.log('[LeetSync] Submission finished, not accepted:', parsed.status_msg);
           }
-          pendingSubmissionId = null;
+          pendingSubmissionIds.delete(id);
         }
       } catch {
         // not JSON / not relevant
@@ -51,8 +52,8 @@ export default defineContentScript({
             try {
               const parsed = JSON.parse(body);
               if (parsed.submission_id) {
-                pendingSubmissionId = parsed.submission_id;
-                console.log('[LeetSync] submission started:', pendingSubmissionId);
+                pendingSubmissionIds.add(String(parsed.submission_id));
+                console.log('[LeetSync] submission started:', parsed.submission_id);
               }
             } catch {}
           })
@@ -89,8 +90,8 @@ export default defineContentScript({
             if (body) {
               const parsed = JSON.parse(body);
               if (parsed.submission_id) {
-                pendingSubmissionId = parsed.submission_id;
-                console.log('[LeetSync] submission started (XHR):', pendingSubmissionId);
+                pendingSubmissionIds.add(String(parsed.submission_id));
+                console.log('[LeetSync] submission started (XHR):', parsed.submission_id);
               }
             }
           } catch {}
