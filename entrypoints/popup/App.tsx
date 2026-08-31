@@ -24,9 +24,13 @@ type LeetflowConfig = {
 };
 
 const EXTENSION_MAP: Record<string, string> = {
-  java: 'java', python: 'py', python3: 'py', javascript: 'js',
-  typescript: 'ts', cpp: 'cpp', c: 'c', csharp: 'cs', golang: 'go',
-  kotlin: 'kt', swift: 'swift', rust: 'rs', ruby: 'rb', scala: 'scala', php: 'php',
+  java: 'java', python: 'py', python3: 'py', pythondata: 'py',
+  javascript: 'js', typescript: 'ts', react: 'jsx',
+  cpp: 'cpp', c: 'c', csharp: 'cs', golang: 'go',
+  kotlin: 'kt', swift: 'swift', rust: 'rs', ruby: 'rb',
+  scala: 'scala', php: 'php', dart: 'dart', elixir: 'ex',
+  erlang: 'erl', racket: 'rkt',
+  mysql: 'sql', mssql: 'sql', oraclesql: 'sql', postgresql: 'sql',
 };
 
 const NEW_FOLDER_OPTION = '__new__';
