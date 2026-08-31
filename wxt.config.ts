@@ -5,5 +5,8 @@ export default defineConfig({
   manifest: {
     permissions: ['storage'],
     options_page: 'options.html',
+    action: {
+      default_title: 'LeetFlow',
+    },
   },
 });
