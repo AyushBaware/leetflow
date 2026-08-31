@@ -17,11 +17,43 @@ Filenames follow `{problem number}_{TitleInPascalCase}.{extension}`. Add a comme
 
 If a push would overwrite an existing file, LeetFlow won't do it on the first click — it warns you and requires a second, explicit confirmation.
 
-## Setup
+## Use it
 
-1. `chrome://extensions` → Developer mode → Load unpacked → select the built `.output/chrome-mv3` folder.
-2. Open the extension's Options page, generate a GitHub fine-grained token scoped to just your target repo with "Contents: Read and write," and enter your token, repo owner, and repo name.
-3. Save & Test Connection.
+Takes about 5 minutes, no coding required.
+
+**1. Download**
+Go to the [Releases](../../releases) page and download the latest `leetflow-*-chrome.zip` under "Assets." Unzip it into a folder — keep that folder where it is afterward, Chrome reads the extension directly from it.
+
+**2. Load it into Chrome**
+- Open `chrome://extensions`
+- Turn on **Developer mode** using the toggle in the top-right corner
+- Click **Load unpacked** and select the folder you just unzipped
+- LeetFlow should now show up in your extensions list
+
+**3. Connect your GitHub account**
+- Click the LeetFlow icon in your toolbar, then **Open Settings**
+- You'll need a GitHub token — this is what lets LeetFlow push code to your repo on your behalf, and it's scoped so it can only touch the one repo you pick, nothing else on your account:
+  - Go to `github.com/settings/tokens?type=beta` and click **Generate new token**
+  - Under "Repository access," choose **Only select repositories** and pick the repo you want your solutions pushed to
+  - Under "Permissions," set **Contents** to **Read and write**
+  - Click **Generate token** and copy it immediately — GitHub only shows it once
+- Paste the token into LeetFlow's Settings page along with your GitHub username and repo name, then click **Save & Test Connection**
+
+**4. You're set**
+Solve any problem on LeetCode and submit it. Once it's Accepted, click the LeetFlow icon — your solution is waiting there for you to review and push.
+
+## Build it yourself
+
+For anyone who wants to read, modify, or contribute to the source.
+
+git clone https://github.com/AyushBaware/leetflow.git
+cd leetflow
+npm install
+npm run dev # development, with hot reload
+npm run build # production build
+npm run zip # packages a distributable zip
+
+Then load `.output/chrome-mv3` (or `.output/chrome-mv3-dev` if using `npm run dev`) unpacked, the same way as step 2 above.
 
 ## Stack
 
